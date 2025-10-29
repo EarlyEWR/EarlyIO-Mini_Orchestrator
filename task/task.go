@@ -30,6 +30,32 @@ type TaskEvent struct {
 	Task      Task
 }
 
+type Config struct {
+	Name          string
+	AttachStdin   bool
+	AttachStdout  bool
+	AttachStderr  bool
+	ExposedPorts  nat.PortSet
+	Cmd           []string
+	Cpu           float64
+	Memory        int64
+	Disk          int64
+	Env           []string
+	RestartPolicy string
+}
+
+type Docker struct {
+	// Client client.Client I have't made the client yet
+	Config Config
+}
+
+type DockerResult struct {
+	Error       error
+	Action      string
+	ContainerID string
+	Result      string
+}
+
 type State int
 
 const (
