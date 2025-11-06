@@ -1,8 +1,17 @@
 package task
 
 import (
+	"math"
 	"time"
 
+	"context"
+	"io"
+	"log"
+	"os"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/google/uuid"
 )
@@ -42,10 +51,11 @@ type Config struct {
 	Disk          int64
 	Env           []string
 	RestartPolicy string
+	Image         string
 }
 
 type Docker struct {
-	// Client client.Client I have't made the client yet
+	Client *client.Client
 	Config Config
 }
 
@@ -54,6 +64,87 @@ type DockerResult struct {
 	Action      string
 	ContainerID string
 	Result      string
+}
+
+func (d *Docker) Run() DockerResult {
+	ctx := context.Background()
+	reader, err := d.Client.ImagePull(ctx, d.Config.Image, image.PullOptions{})
+	if err != nil {
+		log.Printf("Error pulling image %s: %v\n", d.Config.Image, err)
+		return DockerResult{Error: err}
+	}
+	io.Copy(os.Stdout, reader)
+
+	rp := container.RestartPolicy{
+		Name: container.RestartPolicyMode(d.Config.RestartPolicy),
+	}
+
+	r := container.Resources{
+		Memory:   d.Config.Memory,
+		NanoCPUs: int64(d.Config.Cpu * math.Pow(10, 9)),
+	}
+
+	cc := container.Config{
+		Image:        d.Config.Image,
+		Tty:          false,
+		Env:          d.Config.Env,
+		ExposedPorts: d.Config.ExposedPorts,
+	}
+
+	hc := container.HostConfig{
+		RestartPolicy:   rp,
+		Resources:       r,
+		PublishAllPorts: true,
+	}
+
+	resp, err := d.Client.ContainerCreate(ctx, &cc, &hc, nil, nil, d.Config.Name)
+	if err != nil {
+		log.Printf("Error creating container using image %s: %v\n", d.Config.Image, err)
+		return DockerResult{Error: err}
+	}
+
+	err = d.Client.ContainerStart(ctx, resp.ID, container.StartOptions{})
+	if err != nil {
+		log.Printf("Error starting container %s: %v\n", resp.ID, err)
+		return DockerResult{Error: err}
+	}
+
+	// d.Config.Runtime.ContainerID = resp.ID // Commented out, no Runtime field in Config
+	out, err := d.Client.ContainerLogs(
+		ctx,
+		resp.ID,
+		container.LogsOptions{ShowStdout: true, ShowStderr: true},
+	)
+	if err != nil {
+		log.Printf("Error getting logs for container %s: %v\n", resp.ID, err)
+		return DockerResult{Error: err}
+	}
+	io.Copy(os.Stdout, out)
+
+	return DockerResult{Error: nil, Action: "ImagePulled", ContainerID: resp.ID, Result: "Image pulled and container started successfully"}
+}
+
+func (d *Docker) Stop(id string) DockerResult {
+	log.Printf("Attempting to stop container %v", id)
+	ctx := context.Background()
+	timeout := 10
+	err := d.Client.ContainerStop(ctx, id, container.StopOptions{Timeout: &timeout})
+	if err != nil {
+		log.Printf("Error stopping container %s: %v\n", id, err)
+		return DockerResult{Error: err}
+	}
+
+	err = d.Client.ContainerRemove(ctx, id, container.RemoveOptions{
+		RemoveVolumes: true,
+		RemoveLinks:   false,
+		Force:         false,
+	})
+	if err != nil {
+		log.Printf("Error removing container %s: %v\n", id, err)
+		return DockerResult{Error: err}
+	}
+
+	return DockerResult{Action: "stop", Result: "success", Error: nil}
 }
 
 type State int
