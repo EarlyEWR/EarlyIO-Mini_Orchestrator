@@ -115,6 +115,7 @@ func (d *Docker) Run() DockerResult {
 		resp.ID,
 		container.LogsOptions{ShowStdout: true, ShowStderr: true},
 	)
+
 	if err != nil {
 		log.Printf("Error getting logs for container %s: %v\n", resp.ID, err)
 		return DockerResult{Error: err}
