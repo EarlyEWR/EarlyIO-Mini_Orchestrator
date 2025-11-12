@@ -61,3 +61,5 @@ func (w *Worker) StopTask() {
 		return result
 	}
 }
+
+func 
