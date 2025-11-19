@@ -1,3 +1,5 @@
+package task
+
 var stateTransitionMap = map[State][]State{
 	Pending:   []State{Scheduled},
 	Scheduled: []State{Scheduled, Running, Failed},

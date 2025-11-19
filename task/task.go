@@ -59,6 +59,27 @@ type Docker struct {
 	Config Config
 }
 
+func NewConfig(t *Task) Config {
+	return Config{
+		Name:          t.Name,
+		Image:         t.Image,
+		Cpu:           t.CPU,
+		Memory:        t.Memory,
+		Disk:          t.Disk,
+		Env:           []string{},
+		ExposedPorts:  t.ExposedPorts,
+		RestartPolicy: t.RestartPolicy,
+	}
+}
+
+func NewDocker(config Config) *Docker {
+	dc, _ := client.NewClientWithOpts(client.FromEnv)
+	return &Docker{
+		Client: dc,
+		Config: config,
+	}
+}
+
 type DockerResult struct {
 	Error       error
 	Action      string
@@ -109,7 +130,6 @@ func (d *Docker) Run() DockerResult {
 		return DockerResult{Error: err}
 	}
 
-	// d.Config.Runtime.ContainerID = resp.ID // Commented out, no Runtime field in Config
 	out, err := d.Client.ContainerLogs(
 		ctx,
 		resp.ID,
