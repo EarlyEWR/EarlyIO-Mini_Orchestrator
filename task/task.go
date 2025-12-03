@@ -109,7 +109,6 @@ func (d *Docker) Run() DockerResult {
 		return DockerResult{Error: err}
 	}
 
-	// d.Config.Runtime.ContainerID = resp.ID // Commented out, no Runtime field in Config
 	out, err := d.Client.ContainerLogs(
 		ctx,
 		resp.ID,
